@@ -1,0 +1,386 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  WORKER
+  CLIENT
+}
+
+enum OrderStatus {
+  NEW
+  SCHEDULED
+  IN_PROGRESS
+  WAITING
+  COMPLETED
+  DELIVERED
+}
+
+enum PaymentMethod {
+  CASH
+  POS
+  AZERICARD
+  BANK_TRANSFER
+  BONUS
+  MIXED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum BonusTxType {
+  EARN
+  SPEND
+  EXPIRE
+  ADJUST
+}
+
+enum DiscountType {
+  FIXED
+  PERCENT
+  MANUAL
+}
+
+enum InventoryTxReason {
+  ORDER_CONSUME
+  ADJUSTMENT
+  RESTOCK
+}
+
+enum PayrollModel {
+  FIXED
+  PERCENT
+  PERCENT_BONUS
+  KPI
+}
+
+enum LoyaltyTier {
+  SILVER
+  GOLD
+  PLATINUM
+}
+
+enum NotificationChannel {
+  WHATSAPP
+  EMAIL
+  SMS
+  INSTAGRAM
+}
+
+model Branch {
+  id        String   @id @default(cuid())
+  name      String
+  timezone  String   @default("Asia/Baku")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users                 User[]
+  clients               Client[]
+  vehicles              Vehicle[]
+  orders                Order[]
+  inventoryItems        InventoryItem[]
+  cashRegisterSnapshots CashRegisterDay[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  firstName    String?
+  lastName     String?
+  role         UserRole @default(WORKER)
+  branchId     String?
+  branch       Branch?  @relation(fields: [branchId], references: [id])
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  auditLogs      AuditLog[]
+  ordersAssigned Order[]  @relation("OrderAssignee")
+  payrollProfile PayrollProfile?
+}
+
+model Client {
+  id         String   @id @default(cuid())
+  phone      String?
+  email      String?
+  firstName  String?
+  lastName   String?
+  birthDate  DateTime?
+  vip        Boolean  @default(false)
+  loyaltyTier LoyaltyTier @default(SILVER)
+  branchId   String?
+  branch     Branch?  @relation(fields: [branchId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  vehicles     Vehicle[]
+  orders       Order[]
+  bonusWallet  ClientBonusWallet?
+  bonusTx      BonusTransaction[]
+}
+
+model Vehicle {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  vin       String?
+  plate     String?
+  make      String?
+  model     String?
+  color     String?
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+}
+
+model ServiceCategory {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  sortOrder Int       @default(0)
+  services  Service[]
+}
+
+model Service {
+  id          String          @id @default(cuid())
+  categoryId  String
+  category    ServiceCategory @relation(fields: [categoryId], references: [id])
+  name        String
+  description String?
+  priceCents  Int
+  durationMin Int?
+  isPromo     Boolean         @default(false)
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  orderLines          OrderLine[]
+  inventoryUsages     ServiceInventoryUsage[]
+  packageItems        ServicePackageItem[] @relation("PackageParent")
+  componentInPackages ServicePackageItem[] @relation("PackageComponent")
+}
+
+/// Links a "package" service to component services (MVP: optional; use parent Service as package header).
+model ServicePackageItem {
+  id            String  @id @default(cuid())
+  packageId     String
+  componentId   String
+  package       Service @relation("PackageParent", fields: [packageId], references: [id], onDelete: Cascade)
+  component     Service @relation("PackageComponent", fields: [componentId], references: [id], onDelete: Cascade)
+  defaultQty    Int     @default(1)
+}
+
+model Order {
+  id              String        @id @default(cuid())
+  branchId        String?
+  branch          Branch?       @relation(fields: [branchId], references: [id])
+  clientId        String
+  client          Client        @relation(fields: [clientId], references: [id])
+  vehicleId       String
+  vehicle         Vehicle       @relation(fields: [vehicleId], references: [id])
+  status          OrderStatus   @default(NEW)
+  assigneeId      String?
+  assignee        User?         @relation("OrderAssignee", fields: [assigneeId], references: [id])
+  subtotalCents   Int           @default(0)
+  discountType    DiscountType?
+  discountValue   Int?
+  discountReason  String?
+  discountComment String?
+  bonusUsedCents  Int           @default(0)
+  finalTotalCents Int           @default(0)
+  paymentStatus   PaymentStatus @default(PENDING)
+  notes           String?
+  scheduledAt     DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  lines         OrderLine[]
+  payments      Payment[]
+  auditLogs     AuditLog[]
+  inventoryTx   InventoryTransaction[]
+}
+
+model OrderLine {
+  id             String  @id @default(cuid())
+  orderId        String
+  order          Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  serviceId      String
+  service        Service @relation(fields: [serviceId], references: [id])
+  qty            Int     @default(1)
+  unitPriceCents Int
+  lineTotalCents Int
+}
+
+model Payment {
+  id                   String        @id @default(cuid())
+  orderId              String
+  order                Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  method               PaymentMethod
+  amountCents          Int
+  status               PaymentStatus @default(PENDING)
+  transactionReference String?
+  createdAt            DateTime      @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  orderId   String?
+  order     Order?   @relation(fields: [orderId], references: [id])
+  action    String
+  metadata  Json?
+  ip        String?
+  createdAt DateTime @default(now())
+}
+
+model ClientBonusWallet {
+  clientId         String @id
+  client           Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  balanceCents     Int    @default(0)
+  lifetimeEarned   Int    @default(0)
+  lifetimeSpent    Int    @default(0)
+  updatedAt        DateTime @updatedAt
+}
+
+model BonusTransaction {
+  id            String      @id @default(cuid())
+  clientId      String
+  client        Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  type          BonusTxType
+  amountCents   Int
+  sourceOrderId String?
+  note          String?
+  createdAt     DateTime    @default(now())
+}
+
+model InventoryItem {
+  id          String   @id @default(cuid())
+  branchId    String?
+  branch      Branch?  @relation(fields: [branchId], references: [id])
+  sku         String
+  name        String
+  unit        String   @default("unit")
+  quantity    Decimal  @default(0) @db.Decimal(18, 4)
+  minQuantity Decimal? @db.Decimal(18, 4)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  usages        ServiceInventoryUsage[]
+  transactions  InventoryTransaction[]
+
+  @@unique([branchId, sku])
+}
+
+model ServiceInventoryUsage {
+  id          String        @id @default(cuid())
+  serviceId   String
+  service     Service       @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  itemId      String
+  item        InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  qtyPerOrder Decimal       @db.Decimal(18, 4)
+}
+
+model InventoryTransaction {
+  id        String            @id @default(cuid())
+  itemId    String
+  item      InventoryItem     @relation(fields: [itemId], references: [id])
+  orderId   String?
+  order     Order?            @relation(fields: [orderId], references: [id])
+  reason    InventoryTxReason
+  delta     Decimal           @db.Decimal(18, 4)
+  note      String?
+  createdAt DateTime          @default(now())
+}
+
+model PayrollProfile {
+  id        String       @id @default(cuid())
+  userId    String       @unique
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  model     PayrollModel @default(FIXED)
+  baseCents Int?
+  percentBp Int?
+  notes     String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  runs PayrollRun[]
+}
+
+model PayrollRun {
+  id         String   @id @default(cuid())
+  profileId  String
+  profile    PayrollProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  periodStart DateTime
+  periodEnd   DateTime
+  amountCents Int
+  meta       Json?
+  createdAt  DateTime @default(now())
+}
+
+model CashRegisterDay {
+  id              String   @id @default(cuid())
+  branchId        String?
+  branch          Branch?  @relation(fields: [branchId], references: [id])
+  day             DateTime @db.Date
+  cashCents       Int      @default(0)
+  posCents        Int      @default(0)
+  azericardCents  Int      @default(0)
+  bankCents       Int      @default(0)
+  bonusCents      Int      @default(0)
+  discountCents   Int      @default(0)
+  revenueCents    Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  @@unique([branchId, day])
+}
+
+model NotificationOutbox {
+  id        String              @id @default(cuid())
+  channel   NotificationChannel
+  to        String
+  template  String
+  payload   Json
+  status    String              @default("pending")
+  error     String?
+  createdAt DateTime            @default(now())
+  sentAt    DateTime?
+}
+
+model EvolutionWebhookEvent {
+  id        String   @id @default(cuid())
+  eventType String
+  raw       Json
+  createdAt DateTime @default(now())
+}
+
+model InstagramWebhookEvent {
+  id        String   @id @default(cuid())
+  eventType String
+  raw       Json
+  createdAt DateTime @default(now())
+}
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

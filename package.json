@@ -1,0 +1,23 @@
+{
+  "name": "edetailing-crm",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev -w web",
+    "dev:client": "npm run dev -w client-portal",
+    "dev:api": "npm run start:dev -w api",
+    "dev:worker": "npm run dev -w worker",
+    "build": "npm run build -w @edetailing/db && npm run build -w api && npm run build -w web && npm run build -w worker && npm run build -w client-portal",
+    "lint": "npm run lint -w web && npm run lint -w client-portal && npm run lint -w api && npm run lint -w worker",
+    "db:generate": "npm run generate -w @edetailing/db",
+    "db:migrate": "npm run migrate:dev -w @edetailing/db",
+    "db:push": "npm run db:push -w @edetailing/db",
+    "test:api": "npm run test -w api"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
