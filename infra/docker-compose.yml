@@ -1,4 +1,4 @@
-version: '3.9'
+name: washer
 
 services:
   postgres:
@@ -47,14 +47,71 @@ services:
       - '9001:9001'
     volumes:
       - minio_data:/data
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/api.Dockerfile
+    container_name: washer-api
+    env_file:
+      - ../.env
+    environment:
+      DATABASE_URL: postgresql://washer:washer@postgres:5432/washer?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      S3_ENDPOINT: http://minio:9000
+      EVOLUTION_API_URL: http://evolution-api:8080
+      OLLAMA_BASE_URL: http://ollama:11434
+      API_HOST: 0.0.0.0
+      API_PORT: 4000
+      CORS_ORIGINS: http://localhost:3000,http://localhost:3001
+    ports:
+      - '4000:4000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/worker.Dockerfile
+    container_name: washer-worker
+    env_file:
+      - ../.env
+    environment:
+      DATABASE_URL: postgresql://washer:washer@postgres:5432/washer?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ..
+      dockerfile: docker/web.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:4000
+    container_name: washer-web
+    environment:
+      NODE_ENV: production
+    ports:
+      - '3000:3000'
+    depends_on:
+      - api
     restart: unless-stopped
 
   evolution-api:
+    profiles: ['extras']
     image: atendai/evolution-api:latest
     container_name: washer-evolution
     environment:
@@ -68,6 +125,7 @@ services:
     restart: unless-stopped
 
   ollama:
+    profiles: ['extras']
     image: ollama/ollama:latest
     container_name: washer-ollama
     ports:
