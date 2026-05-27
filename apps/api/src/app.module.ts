@@ -1,38 +1,46 @@
-import { Module, OnApplicationBootstrap } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { AiModule } from './ai/ai.module';
-import { AnalyticsModule } from './analytics/analytics.module';
-import { AppController } from './app.controller';
-import { AuditModule } from './audit/audit.module';
-import { AuthModule } from './auth/auth.module';
-import { BonusesModule } from './bonuses/bonuses.module';
-import { BranchesModule } from './branches/branches.module';
-import { CashRegisterModule } from './cash-register/cash-register.module';
-import { CatalogModule } from './catalog/catalog.module';
-import { ClientsModule } from './clients/clients.module';
+import { LoggerModule } from 'nestjs-pino';
+
+import { PrismaModule } from './prisma/prisma.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { UsersModule } from './modules/users/users.module';
+import { BranchesModule } from './modules/branches/branches.module';
+import { ClientsModule } from './modules/clients/clients.module';
+import { VehiclesModule } from './modules/vehicles/vehicles.module';
+import { CatalogModule } from './modules/catalog/catalog.module';
+import { OrdersModule } from './modules/orders/orders.module';
+import { PaymentsModule } from './modules/payments/payments.module';
+import { PricingModule } from './modules/pricing/pricing.module';
+import { BonusesModule } from './modules/bonuses/bonuses.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
+import { CashRegisterModule } from './modules/cash-register/cash-register.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { AuditModule } from './modules/audit/audit.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
+import { AzericardModule } from './modules/azericard/azericard.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
-import { InstagramModule } from './instagram/instagram.module';
-import { InventoryModule } from './inventory/inventory.module';
-import { NotificationsModule } from './notifications/notifications.module';
-import { OrdersModule } from './orders/orders.module';
-import { PayrollModule } from './payroll/payroll.module';
-import { PrismaModule } from './prisma/prisma.module';
-import { TenantModule } from './tenant/tenant.module';
-import { UsersModule } from './users/users.module';
-import { UsersService } from './users/users.service';
-import { VehiclesModule } from './vehicles/vehicles.module';
-import { WhatsappModule } from './whatsapp/whatsapp.module';
+import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 200 }]),
+    ConfigModule.forRoot({ isGlobal: true, cache: true }),
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level: process.env.LOG_LEVEL ?? 'info',
+        transport:
+          process.env.NODE_ENV !== 'production'
+            ? { target: 'pino-pretty', options: { singleLine: true, colorize: true } }
+            : undefined,
+        redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]'],
+      },
+    }),
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     PrismaModule,
-    AuditModule,
-    NotificationsModule,
     AuthModule,
     UsersModule,
     BranchesModule,
@@ -40,27 +48,22 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
     VehiclesModule,
     CatalogModule,
     OrdersModule,
+    PaymentsModule,
+    PricingModule,
     BonusesModule,
     InventoryModule,
     CashRegisterModule,
     AnalyticsModule,
-    PayrollModule,
+    AuditModule,
+    NotificationsModule,
     WhatsappModule,
-    InstagramModule,
-    TenantModule,
-    AiModule,
+    AzericardModule,
   ],
-  controllers: [AppController],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],
 })
-export class AppModule implements OnApplicationBootstrap {
-  constructor(private readonly users: UsersService) {}
-
-  async onApplicationBootstrap() {
-    await this.users.ensureSeedData();
-  }
-}
+export class AppModule {}

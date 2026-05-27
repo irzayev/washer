@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
-    branches: [main, master]
+    branches: [main]
 
 jobs:
   build:
@@ -13,30 +13,36 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: edetailing
-        ports:
-          - 5432:5432
+          POSTGRES_USER: washer
+          POSTGRES_PASSWORD: washer
+          POSTGRES_DB: washer
+        ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
+          --health-cmd "pg_isready -U washer" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s
+          --health-timeout 5s --health-retries 10
     env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/edetailing?schema=public
+      DATABASE_URL: postgresql://washer:washer@localhost:5432/washer?schema=public
+      JWT_ACCESS_SECRET: testaccesssecret_minimum_32_characters_long_yes
+      JWT_REFRESH_SECRET: testrefreshsecret_minimum_32_characters_long_yes
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      NODE_ENV: test
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: npm
-      - run: npm install
-      - run: npm run db:generate
-      - run: npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
-      - run: npm run lint
-      - run: npm run build -w api
-      - run: npm run build -w web
-      - run: npm run build -w worker
-      - run: npm run build -w client-portal
-      - run: npm run test -w api
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile=false
+      - run: pnpm db:generate
+      - run: pnpm typecheck
+      - run: pnpm --filter @washer/api test
+      - run: pnpm build

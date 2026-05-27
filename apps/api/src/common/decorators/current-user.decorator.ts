@@ -1,19 +1,17 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import type { Request } from 'express';
+import type { UserRole } from '@washer/db';
 
-export type AuthUser = {
-  userId: string;
+export interface RequestUser {
+  id: string;
   email: string;
-  role: string;
+  role: UserRole;
   branchId: string | null;
-};
+}
 
 export const CurrentUser = createParamDecorator(
-  (_data: unknown, ctx: ExecutionContext): AuthUser => {
-    const req = ctx.switchToHttp().getRequest<Request & { user?: AuthUser }>();
-    if (!req.user) {
-      throw new Error('Missing authenticated user');
-    }
-    return req.user;
+  (data: keyof RequestUser | undefined, ctx: ExecutionContext): RequestUser | unknown => {
+    const req = ctx.switchToHttp().getRequest();
+    const user = req.user as RequestUser;
+    return data ? user?.[data] : user;
   },
 );

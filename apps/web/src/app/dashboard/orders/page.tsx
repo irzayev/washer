@@ -1,266 +1,81 @@
-"use client";
+'use client';
+import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
+import { formatMoney } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icon";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { api } from "@/lib/api";
-import { cn } from "@/lib/utils";
-
-type OrderRow = {
-  id: string;
-  status: string;
-  paymentStatus: string;
-  finalTotalCents: number;
-  client: { firstName: string | null; lastName: string | null };
+const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
+  NEW: { label: 'Новый', cls: 'bg-gray-100 text-gray-700' },
+  SCHEDULED: { label: 'Запланирован', cls: 'bg-blue-100 text-blue-700' },
+  IN_PROGRESS: { label: 'В работе', cls: 'bg-amber-100 text-amber-700' },
+  WAITING: { label: 'Ожидание', cls: 'bg-orange-100 text-orange-700' },
+  COMPLETED: { label: 'Завершён', cls: 'bg-emerald-100 text-emerald-700' },
+  DELIVERED: { label: 'Выдан', cls: 'bg-emerald-200 text-emerald-800' },
+  CANCELLED: { label: 'Отменён', cls: 'bg-red-100 text-red-700' },
 };
 
 export default function OrdersPage() {
-  const [rows, setRows] = useState<OrderRow[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    void api<OrderRow[]>("/orders")
-      .then(setRows)
-      .catch((e: Error) => setError(e.message));
+    api.listOrders().then((r) => setItems(r.items)).finally(() => setLoading(false));
   }, []);
 
-  const summary = computeSummary(rows);
-
   return (
-    <div className="space-y-12">
-      {/* Header */}
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <span className="label-caps text-[10px] text-primary/60 mb-2 block">
-            Operations · Work Orders
-          </span>
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-1">
-            Work Orders
-          </h1>
-          <p className="text-on-surface-variant/60 text-sm">
-            Current queue and active treatments.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-2">
-            <Icon name="filter_list" opsz={18} />
-            <span className="label-caps text-[11px]">Filter</span>
-          </Button>
-          <Button variant="liquid" size="sm" className="gap-2 px-4 h-9 rounded-lg">
-            <Icon name="add" opsz={18} />
-            <span className="label-caps text-[11px]">New Order</span>
-          </Button>
-        </div>
-      </header>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-zinc-100">Заказы</h1>
+        <p className="text-sm text-gray-500">Все рабочие заказы автомойки</p>
+      </div>
 
-      {error ? (
-        <div className="liquid-glass rounded-3xl p-6 text-sm text-destructive flex items-center gap-2">
-          <Icon name="error" opsz={20} />
-          {error}
-        </div>
-      ) : null}
-
-      {/* Summary cards */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <SummaryCard
-          label="Active Orders"
-          value={summary.active}
-          accent={`+${summary.todayDelta} today`}
-          progress={summary.activePercent}
-          tone="primary"
-        />
-        <SummaryCard
-          label="Awaiting Payment"
-          value={summary.awaiting}
-          accent="Vehicles waiting"
-          progress={summary.awaitingPercent}
-          tone="muted"
-        />
-        <SummaryCard
-          label="Daily Revenue"
-          value={`${summary.revenueAzn.toLocaleString()} ₼`}
-          accent="REACHED"
-          progress={summary.revenuePercent}
-          tone="primary"
-          highlight
-        />
-      </section>
-
-      {/* Table */}
-      <div className="liquid-glass rounded-3xl overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Reference</TableHead>
-              <TableHead>Client</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Payment</TableHead>
-              <TableHead className="text-right">Value</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 && !error ? (
-              <TableRow>
-                <TableCell colSpan={5} className="py-16 text-center text-outline/50">
-                  <div className="flex flex-col items-center gap-3">
-                    <Icon name="receipt_long" opsz={32} className="text-outline/40" />
-                    <p className="text-sm">No active work orders.</p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : (
-              rows.map((o) => (
-                <TableRow key={o.id} className="group">
-                  <TableCell className="font-mono text-xs">
-                    <Link
-                      href={`/dashboard/orders/${o.id}`}
-                      className="text-outline group-hover:text-primary transition-colors font-medium"
-                    >
-                      #{o.id.slice(0, 8).toUpperCase()}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <span className="font-semibold">
-                      {[o.client.firstName, o.client.lastName].filter(Boolean).join(" ") ||
-                        "—"}
+      <div className="card p-0 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 text-left text-xs uppercase tracking-wider text-gray-500 dark:bg-zinc-800/50">
+            <tr>
+              <th className="px-4 py-3">№</th>
+              <th className="px-4 py-3">Клиент</th>
+              <th className="px-4 py-3">Авто</th>
+              <th className="px-4 py-3">Статус</th>
+              <th className="px-4 py-3 text-right">Сумма</th>
+              <th className="px-4 py-3">Открыт</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200 dark:divide-zinc-800">
+            {loading && (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">Загрузка...</td></tr>
+            )}
+            {!loading && items.length === 0 && (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">Заказов нет</td></tr>
+            )}
+            {items.map((o) => {
+              const st = STATUS_LABEL[o.status] ?? { label: o.status, cls: 'bg-gray-100 text-gray-700' };
+              return (
+                <tr key={o.id} className="hover:bg-gray-50 dark:hover:bg-zinc-800/50">
+                  <td className="px-4 py-3 font-mono text-xs text-gray-700 dark:text-zinc-300">{o.number}</td>
+                  <td className="px-4 py-3 text-gray-900 dark:text-zinc-100">
+                    {o.client?.firstName} {o.client?.lastName ?? ''}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-zinc-400">
+                    {o.vehicle ? `${o.vehicle.make ?? ''} ${o.vehicle.model ?? ''} ${o.vehicle.plate ?? ''}`.trim() : '—'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', st.cls)}>
+                      {st.label}
                     </span>
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={o.status} />
-                  </TableCell>
-                  <TableCell>
-                    <PaymentBadge status={o.paymentStatus} />
-                  </TableCell>
-                  <TableCell className="text-right font-bold tabular-nums text-on-surface">
-                    {(o.finalTotalCents / 100).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}{" "}
-                    ₼
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+                  </td>
+                  <td className="px-4 py-3 text-right font-medium text-gray-900 dark:text-zinc-100">
+                    {formatMoney(o.grandTotal)}
+                  </td>
+                  <td className="px-4 py-3 text-gray-500">
+                    {new Date(o.openedAt).toLocaleString('ru-RU')}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { variant: "primary" | "outline" | "success" | "warning"; label: string; dot?: string }> = {
-    NEW: { variant: "outline", label: "New", dot: "bg-outline" },
-    BOOKED: { variant: "outline", label: "Booked", dot: "bg-outline" },
-    IN_PROGRESS: { variant: "primary", label: "In Progress", dot: "bg-primary" },
-    WAITING: { variant: "warning", label: "Waiting", dot: "bg-orange-400" },
-    COMPLETED: { variant: "success", label: "Completed", dot: "bg-emerald-400" },
-    DELIVERED: { variant: "success", label: "Delivered", dot: "bg-emerald-400" },
-  };
-  const cfg = map[status] ?? { variant: "outline" as const, label: status, dot: "bg-outline" };
-  return (
-    <Badge variant={cfg.variant}>
-      <span className={cn("w-1 h-1 rounded-full", cfg.dot)} />
-      {cfg.label}
-    </Badge>
-  );
-}
-
-function PaymentBadge({ status }: { status: string }) {
-  const map: Record<string, "success" | "warning" | "outline" | "danger"> = {
-    PAID: "success",
-    UNPAID: "warning",
-    PARTIAL: "warning",
-    REFUNDED: "outline",
-    FAILED: "danger",
-  };
-  return <Badge variant={map[status] ?? "outline"}>{status.toLowerCase()}</Badge>;
-}
-
-function SummaryCard({
-  label,
-  value,
-  accent,
-  progress,
-  tone,
-  highlight,
-}: {
-  label: string;
-  value: string | number;
-  accent: string;
-  progress: number;
-  tone: "primary" | "muted";
-  highlight?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "liquid-glass rounded-3xl p-7 relative overflow-hidden",
-        highlight && "bg-primary/5"
-      )}
-    >
-      <div className="relative z-10">
-        <p
-          className={cn(
-            "text-[10px] uppercase tracking-widest font-bold mb-3",
-            highlight ? "text-primary" : "text-outline/60"
-          )}
-        >
-          {label}
-        </p>
-        <div className="flex items-baseline gap-3">
-          <span className="text-3xl md:text-4xl font-bold text-on-surface tracking-tight">
-            {value}
-          </span>
-          <span
-            className={cn(
-              "text-xs font-semibold",
-              tone === "primary" ? "text-primary" : "text-outline"
-            )}
-          >
-            {accent}
-          </span>
-        </div>
-        <div className="mt-5 h-px w-full bg-white/5">
-          <div
-            className={cn(
-              "h-full",
-              tone === "primary" ? "bg-primary" : "bg-outline/40"
-            )}
-            style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function computeSummary(rows: OrderRow[]) {
-  const active = rows.filter((r) =>
-    ["NEW", "BOOKED", "IN_PROGRESS", "WAITING"].includes(r.status)
-  ).length;
-  const awaiting = rows.filter((r) => r.paymentStatus !== "PAID").length;
-  const revenueCents = rows
-    .filter((r) => r.paymentStatus === "PAID")
-    .reduce((sum, r) => sum + r.finalTotalCents, 0);
-  const revenueAzn = Math.round(revenueCents / 100);
-  return {
-    active,
-    awaiting,
-    todayDelta: Math.min(active, 5),
-    activePercent: Math.min(100, active * 8),
-    awaitingPercent: Math.min(100, awaiting * 8),
-    revenueAzn,
-    revenuePercent: Math.min(100, Math.round(revenueAzn / 50)),
-  };
 }

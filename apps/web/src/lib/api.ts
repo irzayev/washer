@@ -1,40 +1,52 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
-export function getAccessToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("accessToken");
-}
-
-export async function api<T>(
-  path: string,
-  init?: RequestInit & { json?: unknown },
-): Promise<T> {
-  const headers = new Headers(init?.headers);
-  if (init?.json !== undefined) {
-    headers.set("Content-Type", "application/json");
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers);
+  if (!headers.has('Content-Type') && init.body) headers.set('Content-Type', 'application/json');
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('access_token');
+    if (token) headers.set('Authorization', `Bearer ${token}`);
   }
-  const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-  const body = init?.json !== undefined ? JSON.stringify(init.json) : init?.body;
-  const res = await fetch(`${API_BASE}/v1${path}`, {
-    ...init,
-    headers,
-    body,
-  });
-  if (res.status === 401 && typeof window !== "undefined") {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-  }
+  const res = await fetch(`${BASE}/api/v1${path}`, { ...init, headers });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || res.statusText);
+    const text = await res.text().catch(() => '');
+    throw new Error(text || `HTTP ${res.status}`);
   }
-  if (res.status === 204) {
-    return undefined as T;
-  }
-  return (await res.json()) as T;
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
 }
 
-export { API_BASE };
+export const api = {
+  login: (email: string, password: string) =>
+    request<{
+      accessToken: string;
+      refreshToken: string;
+      expiresIn: number;
+      user: { id: string; email: string; firstName: string; lastName: string; role: string; branchId: string | null };
+    }>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+
+  me: () => request<{ id: string; email: string; firstName: string; lastName: string; role: string }>('/users/me'),
+
+  dashboard: () =>
+    request<{
+      activeOrders: number;
+      todayOrders: number;
+      todayRevenue: number;
+      clientsCount: number;
+      lowStockItems: number;
+    }>('/analytics/dashboard'),
+
+  revenue: (days = 30) => request<{ day: string; revenue: number }[]>(`/analytics/revenue?days=${days}`),
+
+  listClients: (q = '', page = 1) =>
+    request<{ items: any[]; total: number; page: number; pageSize: number; totalPages: number }>(
+      `/clients?q=${encodeURIComponent(q)}&page=${page}`,
+    ),
+
+  listOrders: (page = 1) =>
+    request<{ items: any[]; total: number; page: number; pageSize: number; totalPages: number }>(
+      `/orders?page=${page}`,
+    ),
+
+  listServices: () => request<any[]>('/catalog/services'),
+};

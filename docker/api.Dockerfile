@@ -1,27 +1,26 @@
-FROM node:22-alpine AS deps
+FROM node:20-alpine AS base
+RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 WORKDIR /app
-COPY package.json package-lock.json* ./
-COPY packages/db/package.json packages/db/
+
+FROM base AS deps
+COPY pnpm-workspace.yaml package.json turbo.json tsconfig.base.json ./
 COPY apps/api/package.json apps/api/
-RUN npm install --omit=dev -w @edetailing/db -w api || npm install --omit=dev
+COPY apps/worker/package.json apps/worker/
+COPY packages/db/package.json packages/db/
+COPY packages/types/package.json packages/types/
+COPY packages/utils/package.json packages/utils/
+COPY packages/config/package.json packages/config/
+RUN pnpm install --frozen-lockfile=false
 
-FROM node:22-alpine AS build
-WORKDIR /app
+FROM deps AS build
 COPY . .
-RUN npm install
-RUN npm run db:generate
-RUN npm run build -w api
+RUN pnpm --filter @washer/db prisma:generate
+RUN pnpm --filter @washer/api build
 
-FROM node:22-alpine AS runner
+FROM node:20-alpine AS runner
+RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 WORKDIR /app
 ENV NODE_ENV=production
-# Monorepo: Nest resolves peer/platform packages from hoisted root node_modules
-ENV NODE_PATH=/app/node_modules:/app/apps/api/node_modules
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/apps/api/node_modules ./apps/api/node_modules
-COPY --from=build /app/apps/api/dist ./apps/api/dist
-COPY --from=build /app/apps/api/package.json ./apps/api/
-COPY --from=build /app/packages/db ./packages/db
-EXPOSE 3001
-ENV PORT=3001
+COPY --from=build /app /app
+EXPOSE 4000
 CMD ["node", "apps/api/dist/main.js"]

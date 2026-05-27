@@ -1,43 +1,34 @@
-import Link from "next/link";
-import { buttonVariants } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icon";
-import { cn } from "@/lib/utils";
+'use client';
+import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
+import { formatMoney } from '@/lib/utils';
 
 export default function AnalyticsPage() {
-  return (
-    <div className="space-y-10 max-w-2xl">
-      <header>
-        <span className="label-caps text-[10px] text-primary/60 mb-2 block">
-          Intelligence · Analytics
-        </span>
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2">
-          Analytics
-        </h1>
-        <p className="text-on-surface-variant/60 text-sm">
-          Revenue curves, retention, and bay throughput — wire this module to
-          your Nest analytics endpoints when ready.
-        </p>
-      </header>
+  const [data, setData] = useState<{ day: string; revenue: number }[]>([]);
+  useEffect(() => {
+    api.revenue(30).then(setData).catch(() => setData([]));
+  }, []);
+  const max = Math.max(1, ...data.map((d) => d.revenue));
 
-      <div className="liquid-glass-deep rounded-3xl p-10 text-center">
-        <Icon
-          name="analytics"
-          opsz={40}
-          className="text-primary/50 mx-auto mb-4"
-        />
-        <p className="text-on-surface-variant/70 text-sm mb-6">
-          Use the dashboard overview for live KPIs until dedicated charts ship.
-        </p>
-        <Link
-          href="/dashboard"
-          className={cn(
-            buttonVariants({ variant: "liquid", size: "lg" }),
-            "rounded-xl gap-2 inline-flex"
-          )}
-        >
-          <Icon name="dashboard" opsz={18} />
-          Open dashboard
-        </Link>
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-zinc-100">Аналитика</h1>
+        <p className="text-sm text-gray-500">Выручка по дням</p>
+      </div>
+
+      <div className="card">
+        <div className="mb-4 text-sm font-medium text-gray-700 dark:text-zinc-300">Последние 30 дней</div>
+        <div className="flex items-end gap-1 h-48">
+          {data.map((d) => (
+            <div
+              key={d.day}
+              className="flex-1 rounded-t bg-brand-500 hover:bg-brand-600 transition-colors relative group"
+              style={{ height: `${(d.revenue / max) * 100}%`, minHeight: 2 }}
+              title={`${new Date(d.day).toLocaleDateString('ru-RU')}: ${formatMoney(d.revenue)}`}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

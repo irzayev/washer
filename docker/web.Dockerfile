@@ -1,14 +1,9 @@
-FROM node:22-alpine AS build
+FROM node:20-alpine AS base
+RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 WORKDIR /app
 COPY . .
-RUN npm install
-RUN npm run build -w web
-
-FROM node:22-alpine AS runner
-WORKDIR /app
+RUN pnpm install --frozen-lockfile=false
+RUN pnpm --filter @washer/web build
 ENV NODE_ENV=production
-COPY --from=build /app/apps/web/.next/standalone ./
-COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
-COPY --from=build /app/apps/web/public ./apps/web/public
 EXPOSE 3000
-CMD ["node", "apps/web/server.js"]
+CMD ["pnpm", "--filter", "@washer/web", "start"]

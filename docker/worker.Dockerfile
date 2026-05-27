@@ -1,15 +1,9 @@
-FROM node:22-alpine AS build
+FROM node:20-alpine AS base
+RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 WORKDIR /app
 COPY . .
-RUN npm install
-RUN npm run db:generate
-RUN npm run build -w worker
-
-FROM node:22-alpine AS runner
-WORKDIR /app
+RUN pnpm install --frozen-lockfile=false
+RUN pnpm --filter @washer/db prisma:generate
+RUN pnpm --filter @washer/worker build
 ENV NODE_ENV=production
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/apps/worker/dist ./apps/worker/dist
-COPY --from=build /app/apps/worker/package.json ./apps/worker/
-COPY --from=build /app/packages/db ./packages/db
 CMD ["node", "apps/worker/dist/main.js"]

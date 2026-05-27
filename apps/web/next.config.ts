@@ -1,18 +1,9 @@
-import type { NextConfig } from "next";
-import path from "node:path";
+import type { NextConfig } from 'next';
 
-const nextConfig: NextConfig = {
-  output: "standalone",
-  outputFileTracingRoot: path.join(__dirname, "../.."),
-  images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "lh3.googleusercontent.com",
-        pathname: "/aida-public/**",
-      },
-    ],
-  },
+const config: NextConfig = {
+  reactStrictMode: true,
+  transpilePackages: ['@washer/types', '@washer/utils'],
+  experimental: { typedRoutes: false },
 };
 
-export default nextConfig;
+export default config;

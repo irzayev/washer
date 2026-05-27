@@ -1,23 +1,34 @@
 {
   "name": "edetailing-crm",
+  "version": "0.1.0",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
-  "scripts": {
-    "dev:web": "npm run dev -w web",
-    "dev:client": "npm run dev -w client-portal",
-    "dev:api": "npm run start:dev -w api",
-    "dev:worker": "npm run dev -w worker",
-    "build": "npm run build -w @edetailing/db && npm run build -w api && npm run build -w web && npm run build -w worker && npm run build -w client-portal",
-    "lint": "npm run lint -w web && npm run lint -w client-portal && npm run lint -w api && npm run lint -w worker",
-    "db:generate": "npm run generate -w @edetailing/db",
-    "db:migrate": "npm run migrate:dev -w @edetailing/db",
-    "db:push": "npm run db:push -w @edetailing/db",
-    "test:api": "npm run test -w api"
-  },
+  "description": "eDetailing CRM — car wash & detailing management platform",
+  "packageManager": "pnpm@9.12.0",
   "engines": {
-    "node": ">=20"
+    "node": ">=20.11.0",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "db:generate": "pnpm --filter @washer/db prisma:generate",
+    "db:migrate": "pnpm --filter @washer/db prisma:migrate",
+    "db:push": "pnpm --filter @washer/db prisma:push",
+    "db:seed": "pnpm --filter @washer/db seed",
+    "db:studio": "pnpm --filter @washer/db prisma:studio",
+    "docker:up": "docker compose -f infra/docker-compose.yml up -d",
+    "docker:down": "docker compose -f infra/docker-compose.yml down",
+    "docker:logs": "docker compose -f infra/docker-compose.yml logs -f"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "prettier": "^3.3.3",
+    "turbo": "^2.1.3",
+    "typescript": "^5.5.4"
   }
 }

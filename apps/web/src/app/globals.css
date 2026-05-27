@@ -1,205 +1,52 @@
-@import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-@custom-variant dark (&:is(.dark *));
-
-/* =========================================================
-   Liquid Glass — design system (Stitch export adapted)
-   Palette anchored on a deep nocturnal foundation; primary
-   "polished chrome blue" accents float above translucent
-   glass surfaces with backdrop-filter blur.
-   ========================================================= */
-
-@theme inline {
-  /* Brand surfaces */
-  --color-surface: #0c1324;
-  --color-surface-dim: #0c1324;
-  --color-surface-bright: #33394c;
-  --color-surface-container-lowest: #070d1f;
-  --color-surface-container-low: #151b2d;
-  --color-surface-container: #191f31;
-  --color-surface-container-high: #23293c;
-  --color-surface-container-highest: #2e3447;
-  --color-on-surface: #dce1fb;
-  --color-on-surface-variant: #c1c6d7;
-  --color-outline: #8b90a0;
-  --color-outline-variant: #414755;
-
-  /* Brand accents */
-  --color-primary: #adc6ff;
-  --color-on-primary: #002e69;
-  --color-primary-container: #4b8eff;
-  --color-on-primary-container: #00285c;
-  --color-inverse-primary: #005bc1;
-
-  /* Semantic shortcuts mapped to the brand palette */
-  --color-background: var(--color-surface-container-lowest);
-  --color-foreground: var(--color-on-surface);
-  --color-card: var(--color-surface-container);
-  --color-card-foreground: var(--color-on-surface);
-  --color-popover: var(--color-surface-container-high);
-  --color-popover-foreground: var(--color-on-surface);
-  --color-primary-foreground: var(--color-on-primary);
-  --color-secondary: var(--color-surface-container-high);
-  --color-secondary-foreground: var(--color-on-surface);
-  --color-muted: var(--color-surface-container);
-  --color-muted-foreground: var(--color-on-surface-variant);
-  --color-accent: var(--color-surface-container-high);
-  --color-accent-foreground: var(--color-on-surface);
-  --color-destructive: #ffb4ab;
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-input: rgba(255, 255, 255, 0.05);
-  --color-ring: rgba(173, 198, 255, 0.4);
-
-  /* Typography */
-  --font-sans: var(--font-jakarta), "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-heading: var(--font-jakarta), "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
-
-  /* Radii — Stitch DESIGN.md scale */
-  --radius: 0.5rem;
-  --radius-sm: 0.25rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
-  --radius-xl: 1.5rem;
-  --radius-2xl: 2rem;
-  --radius-3xl: 2.5rem;
+:root {
+  --background: 255 255 255;
+  --foreground: 17 24 39;
+  --muted: 243 244 246;
+  --muted-foreground: 107 114 128;
+  --border: 229 231 235;
 }
 
-/* Force dark UI — Liquid Glass is dark-only */
-:root,
 .dark {
-  --background: var(--color-background);
-  --foreground: var(--color-foreground);
-  --card: var(--color-card);
-  --card-foreground: var(--color-card-foreground);
-  --popover: var(--color-popover);
-  --popover-foreground: var(--color-popover-foreground);
-  --primary: var(--color-primary);
-  --primary-foreground: var(--color-primary-foreground);
-  --secondary: var(--color-secondary);
-  --secondary-foreground: var(--color-secondary-foreground);
-  --muted: var(--color-muted);
-  --muted-foreground: var(--color-muted-foreground);
-  --accent: var(--color-accent);
-  --accent-foreground: var(--color-accent-foreground);
-  --destructive: var(--color-destructive);
-  --border: var(--color-border);
-  --input: var(--color-input);
-  --ring: var(--color-ring);
-  --sidebar: var(--color-surface-container-lowest);
-  --sidebar-foreground: var(--color-on-surface);
-  --sidebar-primary: var(--color-primary);
-  --sidebar-primary-foreground: var(--color-on-primary);
-  --sidebar-accent: var(--color-surface-container-high);
-  --sidebar-accent-foreground: var(--color-primary);
-  --sidebar-border: var(--color-border);
-  --sidebar-ring: var(--color-ring);
+  --background: 9 9 11;
+  --foreground: 245 245 245;
+  --muted: 24 24 27;
+  --muted-foreground: 161 161 170;
+  --border: 39 39 42;
 }
 
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  html {
-    color-scheme: dark;
-    font-family: var(--font-sans);
-    -webkit-font-smoothing: antialiased;
-  }
-  body {
-    background-color: var(--color-surface-container-lowest);
-    color: var(--color-on-surface);
-    background-image:
-      radial-gradient(at 0% 0%, rgba(173, 198, 255, 0.04) 0px, transparent 50%),
-      radial-gradient(at 100% 100%, rgba(0, 91, 193, 0.06) 0px, transparent 50%);
-    min-height: 100vh;
-  }
-  ::selection {
-    background: rgba(173, 198, 255, 0.3);
-    color: #ffffff;
-  }
+html,
+body {
+  height: 100%;
 }
 
-/* =========================================================
-   Liquid Glass utilities — shared across components.
-   Use as className helpers, or compose inside @apply blocks.
-   ========================================================= */
-@layer components {
-  .liquid-glass {
-    background: rgba(25, 31, 49, 0.4);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-  }
-  .liquid-glass-deep {
-    background: rgba(12, 19, 36, 0.5);
-    backdrop-filter: blur(32px);
-    -webkit-backdrop-filter: blur(32px);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
-  }
-  .liquid-sidebar {
-    background: rgba(7, 13, 31, 0.4);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-  }
-  .liquid-topbar {
-    background: rgba(12, 19, 36, 0.4);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-  }
-  .liquid-gradient {
-    background: linear-gradient(180deg, #4b8eff 0%, #005bc1 100%);
-    box-shadow: 0 4px 15px rgba(0, 91, 193, 0.3);
-  }
-  .etched-input {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    transition: background 200ms ease, border-color 200ms ease;
-  }
-  .etched-input:focus,
-  .etched-input:focus-within {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(173, 198, 255, 0.3);
-    outline: none;
-  }
-  .badge-clean {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(4px);
-  }
-  .label-caps {
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    line-height: 1;
-  }
-}
-
-/* Custom thin scrollbar — matches the Stitch references */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(173, 198, 255, 0.12);
-  border-radius: 10px;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(173, 198, 255, 0.24);
-}
-
-/* Material Symbols base sizing — set globally so <Icon> inherits cleanly */
-.material-symbols-outlined {
-  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
-  font-feature-settings: "liga";
+body {
+  background: rgb(var(--background));
+  color: rgb(var(--foreground));
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   -webkit-font-smoothing: antialiased;
-  user-select: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-primary {
+    @apply btn bg-brand-600 text-white hover:bg-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2;
+  }
+  .btn-secondary {
+    @apply btn bg-gray-100 text-gray-900 hover:bg-gray-200 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700;
+  }
+  .card {
+    @apply rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900;
+  }
+  .input {
+    @apply block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500 dark:border-zinc-700 dark:bg-zinc-900;
+  }
+  .label {
+    @apply block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1;
+  }
 }

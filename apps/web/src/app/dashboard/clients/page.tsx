@@ -1,178 +1,95 @@
-"use client";
-
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Icon } from "@/components/ui/icon";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { api } from "@/lib/api";
-
-type ClientRow = {
-  id: string;
-  firstName: string | null;
-  lastName: string | null;
-  phone: string | null;
-  vip: boolean;
-};
+'use client';
+import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
+import { formatMoney } from '@/lib/utils';
+import { Search, Plus } from 'lucide-react';
 
 export default function ClientsPage() {
-  const [rows, setRows] = useState<ClientRow[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
+  const [items, setItems] = useState<any[]>([]);
+  const [q, setQ] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await api.listClients(q);
+      setItems(res.items);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    void api<ClientRow[]>("/clients")
-      .then(setRows)
-      .catch((e: Error) => setError(e.message));
-  }, []);
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) =>
-      [r.firstName, r.lastName, r.phone]
-        .filter(Boolean)
-        .some((v) => v!.toLowerCase().includes(q))
-    );
-  }, [rows, query]);
+    const t = setTimeout(load, 250);
+    return () => clearTimeout(t);
+  }, [q]);
 
   return (
-    <div className="space-y-10">
-      {/* Header */}
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <span className="label-caps text-[10px] text-primary/60 mb-2 block">
-            CRM · Client Portfolio
-          </span>
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-1">
-            Client Directory
-          </h1>
-          <p className="text-on-surface-variant/60 text-sm">
-            Managing {rows.length} active portfolio{rows.length === 1 ? "" : "s"}.
-          </p>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-zinc-100">Клиенты</h1>
+          <p className="text-sm text-gray-500">База клиентов и их автомобилей</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" className="gap-2">
-            <Icon name="filter_list" opsz={18} />
-            <span className="label-caps text-[11px]">Filters</span>
-          </Button>
-          <Button variant="outline" size="sm" className="gap-2">
-            <Icon name="file_download" opsz={18} />
-            <span className="label-caps text-[11px]">Export</span>
-          </Button>
-          <Button variant="liquid" size="sm" className="gap-2 px-4 h-9 rounded-lg">
-            <Icon name="add" opsz={18} />
-            <span className="label-caps text-[11px]">New Client</span>
-          </Button>
-        </div>
-      </header>
-
-      {error ? (
-        <div className="liquid-glass rounded-3xl p-6 text-sm text-destructive flex items-center gap-2">
-          <Icon name="error" opsz={20} />
-          {error}
-        </div>
-      ) : null}
-
-      {/* Search bar */}
-      <div className="relative max-w-md">
-        <Icon
-          name="search"
-          opsz={18}
-          className="absolute left-4 top-1/2 -translate-y-1/2 text-outline/40 pointer-events-none"
-        />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by name or phone…"
-          className="etched-input w-full h-10 rounded-xl pl-11 pr-4 text-sm placeholder:text-outline/40"
-        />
+        <button className="btn-primary">
+          <Plus className="h-4 w-4" /> Добавить клиента
+        </button>
       </div>
 
-      {/* Table */}
-      <div className="liquid-glass rounded-3xl overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Client</TableHead>
-              <TableHead>Phone</TableHead>
-              <TableHead className="text-center">Status</TableHead>
-              <TableHead className="text-right pr-10"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={4} className="py-16 text-center text-outline/50">
-                  <div className="flex flex-col items-center gap-3">
-                    <Icon name="group_off" opsz={32} className="text-outline/40" />
-                    <p className="text-sm">No clients match.</p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : (
-              filtered.map((c) => {
-                const fullName =
-                  [c.firstName, c.lastName].filter(Boolean).join(" ") || "—";
-                const initials =
-                  ((c.firstName?.[0] ?? "") + (c.lastName?.[0] ?? "")).toUpperCase() ||
-                  "?";
-                return (
-                  <TableRow key={c.id} className="cursor-pointer group">
-                    <TableCell className="py-6">
-                      <Link
-                        href={`/dashboard/clients/${c.id}`}
-                        className="flex items-center gap-4"
-                      >
-                        <span className="w-10 h-10 rounded-xl bg-surface-container-high flex items-center justify-center font-bold text-primary border border-primary/10 text-xs">
-                          {initials}
-                        </span>
-                        <span className="flex flex-col">
-                          <span className="font-bold text-on-surface">
-                            {fullName}
-                          </span>
-                          <span className="text-outline/60 text-xs">
-                            {c.phone ?? "no phone"}
-                          </span>
-                        </span>
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-on-surface-variant">
-                        {c.phone ?? "—"}
+      <div className="card p-0">
+        <div className="border-b border-gray-200 p-4 dark:border-zinc-800">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+            <input
+              className="input pl-9"
+              placeholder="Поиск по имени, телефону, email..."
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-left text-xs uppercase tracking-wider text-gray-500 dark:bg-zinc-800/50">
+              <tr>
+                <th className="px-4 py-3">Имя</th>
+                <th className="px-4 py-3">Телефон</th>
+                <th className="px-4 py-3">VIP</th>
+                <th className="px-4 py-3">Авто</th>
+                <th className="px-4 py-3">Бонусы</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-zinc-800">
+              {loading && (
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">Загрузка...</td></tr>
+              )}
+              {!loading && items.length === 0 && (
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">Клиенты не найдены</td></tr>
+              )}
+              {items.map((c) => (
+                <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-zinc-800/50">
+                  <td className="px-4 py-3 font-medium text-gray-900 dark:text-zinc-100">
+                    {c.firstName} {c.lastName ?? ''}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-zinc-400">{c.phone}</td>
+                  <td className="px-4 py-3">
+                    {c.vipTier !== 'NONE' && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                        {c.vipTier}
                       </span>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {c.vip ? (
-                        <Badge variant="platinum">VIP</Badge>
-                      ) : (
-                        <Badge variant="silver">Standard</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right pr-10">
-                      <Link
-                        href={`/dashboard/clients/${c.id}`}
-                        className="inline-flex items-center justify-end text-outline/30 group-hover:text-primary transition-colors"
-                        aria-label="Open profile"
-                      >
-                        <Icon name="arrow_forward_ios" opsz={18} />
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-zinc-400">
+                    {c.vehicles?.length ?? 0}
+                  </td>
+                  <td className="px-4 py-3 text-gray-900 dark:text-zinc-100">
+                    {formatMoney(c.bonusWallet?.balance ?? 0)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

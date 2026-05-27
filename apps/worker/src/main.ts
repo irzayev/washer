@@ -1,88 +1,103 @@
-import { Worker } from 'bullmq';
-import IORedis from 'ioredis';
-import PDFDocument from 'pdfkit';
-import { PrismaClient } from '@prisma/client';
+import 'reflect-metadata';
+import { Worker, Queue, type ConnectionOptions } from 'bullmq';
+import pino from 'pino';
+import { PrismaClient, NotificationStatus, OutboxStatus } from '@washer/db';
+import { loadApiEnv } from '@washer/config';
 
-const connection = new IORedis(process.env.REDIS_URL ?? 'redis://127.0.0.1:6379', {
-  maxRetriesPerRequest: null,
+const env = loadApiEnv();
+const logger = pino({
+  level: env.LOG_LEVEL,
+  transport: env.NODE_ENV !== 'production' ? { target: 'pino-pretty' } : undefined,
 });
+
+const connection: ConnectionOptions = {
+  host: env.REDIS_HOST,
+  port: env.REDIS_PORT,
+  password: env.REDIS_PASSWORD || undefined,
+};
 
 const prisma = new PrismaClient();
 
-async function sendEvolutionText(number: string, text: string) {
-  const base = process.env.EVOLUTION_API_URL;
-  const key = process.env.EVOLUTION_API_KEY;
-  const instance = process.env.EVOLUTION_INSTANCE_NAME;
-  if (!base || !instance) {
-    console.warn('[whatsapp] Evolution not configured (EVOLUTION_API_URL / EVOLUTION_INSTANCE_NAME)');
-    return;
-  }
-  const url = `${base.replace(/\/$/, '')}/message/sendText/${instance}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(key ? { apikey: key } : {}),
-    },
-    body: JSON.stringify({ number, text }),
-  });
-  if (!res.ok) {
-    throw new Error(await res.text());
-  }
-}
+export const QUEUES = {
+  notifications: 'notifications',
+  outbox: 'outbox',
+  cron: 'cron',
+} as const;
 
-async function handlePdf(job: { data: { orderId: string } }) {
-  const order = await prisma.order.findUnique({
-    where: { id: job.data.orderId },
-    include: {
-      client: true,
-      lines: { include: { service: true } },
-      payments: true,
-    },
-  });
-  if (!order) {
-    throw new Error(`Order ${job.data.orderId} not found`);
-  }
+const notificationsQueue = new Queue(QUEUES.notifications, { connection });
+const outboxQueue = new Queue(QUEUES.outbox, { connection });
 
-  const doc = new PDFDocument({ margin: 50 });
-  const chunks: Buffer[] = [];
-  doc.on('data', (c) => chunks.push(c as Buffer));
-
-  doc.fontSize(18).text('eDetailing — Invoice', { align: 'center' });
-  doc.moveDown();
-  doc.fontSize(10).text(`Order: ${order.id}`);
-  doc.text(`Client: ${order.client.firstName ?? ''} ${order.client.lastName ?? ''}`.trim());
-  doc.moveDown();
-  order.lines.forEach((line: (typeof order.lines)[number]) => {
-    doc.text(`${line.service.name} x${line.qty} — ${(line.lineTotalCents / 100).toFixed(2)} AZN`);
-  });
-  doc.moveDown();
-  doc.text(`Subtotal: ${(order.subtotalCents / 100).toFixed(2)} AZN`);
-  doc.text(`Discount: ${order.discountValue != null ? String(order.discountValue) : '0'}`);
-  doc.text(`Bonus used: ${(order.bonusUsedCents / 100).toFixed(2)} AZN`);
-  doc.text(`Total: ${(order.finalTotalCents / 100).toFixed(2)} AZN`);
-  doc.end();
-
-  await new Promise<void>((resolve) => doc.on('end', resolve));
-  const pdfBuffer = Buffer.concat(chunks);
-  console.log(`[pdf] generated ${pdfBuffer.length} bytes for order ${order.id}`);
-  return { bytes: pdfBuffer.length };
-}
-
-new Worker(
-  'notifications',
+const notificationsWorker = new Worker(
+  QUEUES.notifications,
   async (job) => {
-    const data = job.data as { to?: string; template?: string; payload?: Record<string, unknown> };
-    if (job.name === 'whatsapp' && data.to) {
-      const text = `[${data.template ?? 'notice'}] ${JSON.stringify(data.payload ?? {})}`;
-      await sendEvolutionText(data.to, text);
-    }
-    console.log('[notifications]', job.name, job.data);
-    return { ok: true };
+    const id = job.data.id as string;
+    const n = await prisma.notification.findUnique({ where: { id } });
+    if (!n || n.status !== NotificationStatus.PENDING) return;
+
+    logger.info({ id, channel: n.channel, template: n.template }, 'sending notification');
+
+    // TODO: dispatch by channel (WHATSAPP -> EvolutionService, SMS -> SMS provider, EMAIL -> Resend)
+    // For MVP: mark as SENT.
+    await prisma.notification.update({
+      where: { id },
+      data: { status: NotificationStatus.SENT, sentAt: new Date(), attempts: { increment: 1 } },
+    });
   },
-  { connection },
+  { connection, concurrency: 5 },
 );
 
-new Worker('pdf', async (job) => handlePdf(job as { data: { orderId: string } }), { connection });
+const outboxWorker = new Worker(
+  QUEUES.outbox,
+  async (job) => {
+    const id = job.data.id as string;
+    const e = await prisma.outboxEvent.findUnique({ where: { id } });
+    if (!e || e.status !== OutboxStatus.PENDING) return;
 
-console.log('worker started: queues notifications, pdf');
+    logger.info({ id, type: e.type }, 'processing outbox event');
+
+    // TODO: route by event type (order.closed -> create WA notification, etc.)
+    await prisma.outboxEvent.update({
+      where: { id },
+      data: { status: OutboxStatus.PROCESSED, processedAt: new Date() },
+    });
+  },
+  { connection, concurrency: 10 },
+);
+
+async function pollAndEnqueue() {
+  const pending = await prisma.notification.findMany({
+    where: { status: NotificationStatus.PENDING, sendAfter: { lte: new Date() } },
+    take: 50,
+  });
+  for (const n of pending) {
+    await notificationsQueue.add('send', { id: n.id }, { jobId: n.id, removeOnComplete: true });
+  }
+
+  const events = await prisma.outboxEvent.findMany({
+    where: { status: OutboxStatus.PENDING },
+    take: 50,
+    orderBy: { createdAt: 'asc' },
+  });
+  for (const e of events) {
+    await outboxQueue.add('process', { id: e.id }, { jobId: e.id, removeOnComplete: true });
+  }
+}
+
+setInterval(() => {
+  pollAndEnqueue().catch((e) => logger.error(e, 'poll failed'));
+}, 5000);
+
+notificationsWorker.on('failed', (j, err) => logger.error({ err: err?.message }, 'job failed'));
+outboxWorker.on('failed', (j, err) => logger.error({ err: err?.message }, 'outbox failed'));
+
+logger.info('Worker started');
+
+const shutdown = async () => {
+  logger.info('Shutting down...');
+  await notificationsWorker.close();
+  await outboxWorker.close();
+  await prisma.$disconnect();
+  process.exit(0);
+};
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
