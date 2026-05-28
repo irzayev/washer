@@ -20,9 +20,9 @@ COPY packages ./packages
 COPY apps/api ./apps/api
 COPY apps/worker ./apps/worker
 RUN pnpm --filter @washer/db prisma:generate
-RUN npx tsc -p packages/types/tsconfig.json \
-    && npx tsc -p packages/utils/tsconfig.json \
-    && npx tsc -p packages/config/tsconfig.json
+RUN npx tsc -p packages/types/tsconfig.json
+RUN npx tsc -p packages/utils/tsconfig.json && ls -la packages/utils/dist/
+RUN npx tsc -p packages/config/tsconfig.json
 RUN pnpm --filter @washer/api build
 
 FROM base AS runner
