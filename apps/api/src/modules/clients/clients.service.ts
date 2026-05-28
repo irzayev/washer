@@ -90,4 +90,67 @@ export class ClientsService {
     await this.findOne(branchId, id);
     await this.prisma.client.update({ where: { id }, data: { deletedAt: new Date() } });
   }
+
+  async history(branchId: string, id: string) {
+    await this.findOne(branchId, id);
+    return this.prisma.order.findMany({
+      where: { clientId: id, branchId, deletedAt: null },
+      orderBy: { openedAt: 'desc' },
+      take: 50,
+      include: { items: { include: { service: true } }, payments: true },
+    });
+  }
+
+  async publicLookup(branchCode: string, phone: string) {
+    const branch = await this.prisma.branch.findFirst({ where: { code: branchCode, isActive: true } });
+    if (!branch) throw new NotFoundException('Branch not found');
+    const normalized = normalizeAzPhone(phone);
+    const client = await this.prisma.client.findFirst({
+      where: { branchId: branch.id, phone: normalized, deletedAt: null },
+      include: { vehicles: true, bonusWallet: true },
+    });
+    if (!client) throw new NotFoundException('Client not found');
+    const orders = await this.prisma.order.findMany({
+      where: { clientId: client.id, status: { in: ['COMPLETED', 'DELIVERED'] } },
+      orderBy: { completedAt: 'desc' },
+      take: 10,
+      include: { items: { include: { service: true } } },
+    });
+    return { client, orders };
+  }
+
+  async segments(branchId: string) {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000);
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 86400000);
+
+    const [all, vip, inactive, frequent] = await Promise.all([
+      this.prisma.client.count({ where: { branchId, deletedAt: null } }),
+      this.prisma.client.count({ where: { branchId, deletedAt: null, vipTier: { not: 'NONE' } } }),
+      this.prisma.client.count({
+        where: {
+          branchId,
+          deletedAt: null,
+          orders: { none: { openedAt: { gte: ninetyDaysAgo }, status: { not: 'CANCELLED' } } },
+        },
+      }),
+      this.prisma.$queryRawUnsafe<{ count: string }[]>(
+        `SELECT COUNT(*)::text AS count FROM (
+          SELECT c.id FROM "Client" c
+          JOIN "Order" o ON o."clientId" = c.id
+          WHERE c."branchId" = $1::uuid AND c."deletedAt" IS NULL
+            AND o."openedAt" >= $2 AND o.status = 'COMPLETED'
+          GROUP BY c.id HAVING COUNT(*) >= 3
+        ) t`,
+        branchId,
+        thirtyDaysAgo,
+      ),
+    ]);
+
+    return {
+      total: all,
+      vip,
+      inactive,
+      frequent: Number(frequent[0]?.count ?? 0),
+    };
+  }
 }

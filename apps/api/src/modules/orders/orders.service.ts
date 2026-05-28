@@ -4,11 +4,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { OrderStatus, Prisma, type VatMode } from '@washer/db';
+import { OrderStatus, Prisma, StockMovementType, type VatMode } from '@washer/db';
 import { Decimal } from 'decimal.js';
 import { generateOrderNumber, money, round2, sumMoney } from '@washer/utils';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PricingService } from '../pricing/pricing.service';
+import { InvoicesService } from '../invoices/invoices.service';
+import { OrdersGateway } from '../realtime/orders.gateway';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CloseOrderDto } from './dto/close-order.dto';
 
@@ -17,6 +19,8 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pricing: PricingService,
+    private readonly invoices: InvoicesService,
+    private readonly realtime: OrdersGateway,
   ) {}
 
   async list(branchId: string, status?: OrderStatus, page = 1, pageSize = 20) {
@@ -103,10 +107,12 @@ export class OrdersService {
         data: { subtotal, grandTotal: subtotal },
       });
 
-      return tx.order.findUniqueOrThrow({
+      const full = await tx.order.findUniqueOrThrow({
         where: { id: order.id },
         include: { items: { include: { service: true } }, client: true, vehicle: true },
       });
+      this.realtime.emitOrderCreated(branchId, { id: full.id, number: full.number, status: full.status });
+      return full;
     });
   }
 
@@ -115,7 +121,9 @@ export class OrdersService {
     const next: Partial<Prisma.OrderUpdateInput> = { status };
     if (status === OrderStatus.IN_PROGRESS && !order.startedAt) next.startedAt = new Date();
     if (status === OrderStatus.DELIVERED) next.deliveredAt = new Date();
-    return this.prisma.order.update({ where: { id }, data: next });
+    const updated = await this.prisma.order.update({ where: { id }, data: next });
+    this.realtime.emitOrderUpdated(branchId, { id, status, number: order.number });
+    return updated;
   }
 
   async previewClose(
@@ -290,6 +298,8 @@ export class OrdersService {
         });
       }
 
+      await this.consumeStock(tx, branchId, id, userId);
+
       await tx.outboxEvent.create({
         data: {
           aggregate: 'order',
@@ -306,7 +316,60 @@ export class OrdersService {
         },
       });
 
-      return updated;
+      await this.invoices.ensureInvoice(id, order.number);
+
+      const result = updated;
+      setImmediate(() => this.realtime.emitOrderUpdated(branchId, { id, status: 'COMPLETED', number: order.number }));
+      return result;
     });
+  }
+
+  private async consumeStock(
+    tx: Prisma.TransactionClient,
+    branchId: string,
+    orderId: string,
+    userId: string,
+  ) {
+    const orderItems = await tx.orderItem.findMany({
+      where: { orderId },
+      include: {
+        service: { include: { consumption: { include: { item: true } } } },
+      },
+    });
+
+    for (const oi of orderItems) {
+      for (const c of oi.service.consumption) {
+        const qty = money(c.qty).mul(oi.qty);
+        if (qty.lte(0)) continue;
+
+        await tx.stockMovement.create({
+          data: {
+            branchId,
+            itemId: c.itemId,
+            type: StockMovementType.USAGE,
+            qty: qty.toNumber(),
+            unitCost: Number(c.item.costAvg),
+            refOrderId: orderId,
+            createdById: userId,
+            note: `Order ${orderId}`,
+          },
+        });
+
+        await tx.inventoryItem.update({
+          where: { id: c.itemId },
+          data: { stockQty: { decrement: qty.toNumber() } },
+        });
+
+        await tx.orderMaterialUsage.create({
+          data: {
+            orderItemId: oi.id,
+            itemId: c.itemId,
+            qtyPlanned: qty.toNumber(),
+            qtyActual: qty.toNumber(),
+            costSnapshot: c.item.costAvg,
+          },
+        });
+      }
+    }
   }
 }

@@ -52,4 +52,46 @@ export class AnalyticsService {
     );
     return rows.map((r) => ({ day: r.day, revenue: Number(r.revenue) }));
   }
+
+  async topServices(branchId: string, days = 30) {
+    const from = new Date(Date.now() - days * 86400000);
+    return this.prisma.$queryRawUnsafe<{ name: string; count: string; revenue: string }[]>(
+      `SELECT s.name, COUNT(*)::text AS count, SUM(oi."priceSnapshot" * oi.qty)::text AS revenue
+       FROM "OrderItem" oi
+       JOIN "Service" s ON s.id = oi."serviceId"
+       JOIN "Order" o ON o.id = oi."orderId"
+       WHERE o."branchId" = $1::uuid AND o.status = 'COMPLETED' AND o."completedAt" >= $2
+       GROUP BY s.name ORDER BY SUM(oi."priceSnapshot" * oi.qty) DESC LIMIT 10`,
+      branchId,
+      from,
+    );
+  }
+
+  async topEmployees(branchId: string, days = 30) {
+    const from = new Date(Date.now() - days * 86400000);
+    return this.prisma.$queryRawUnsafe<{ name: string; orders: string; revenue: string }[]>(
+      `SELECT CONCAT(u."firstName", ' ', u."lastName") AS name,
+              COUNT(DISTINCT o.id)::text AS orders,
+              COALESCE(SUM(o."grandTotal"), 0)::text AS revenue
+       FROM "Order" o
+       JOIN "User" u ON u.id = o."assignedToId"
+       WHERE o."branchId" = $1::uuid AND o.status = 'COMPLETED' AND o."completedAt" >= $2
+       GROUP BY u.id, u."firstName", u."lastName"
+       ORDER BY SUM(o."grandTotal") DESC LIMIT 10`,
+      branchId,
+      from,
+    );
+  }
+
+  async boxLoad(branchId: string) {
+    const boxes = await this.prisma.box.findMany({
+      where: { branchId, isActive: true },
+      include: {
+        orders: {
+          where: { status: { in: [OrderStatus.IN_PROGRESS, OrderStatus.WAITING, OrderStatus.SCHEDULED] } },
+        },
+      },
+    });
+    return boxes.map((b) => ({ id: b.id, name: b.name, activeOrders: b.orders.length }));
+  }
 }

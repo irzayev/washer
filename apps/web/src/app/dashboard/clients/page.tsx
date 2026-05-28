@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { formatMoney } from '@/lib/utils';
@@ -73,7 +74,9 @@ export default function ClientsPage() {
               {items.map((c) => (
                 <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-zinc-800/50">
                   <td className="px-4 py-3 font-medium text-gray-900 dark:text-zinc-100">
-                    {c.firstName} {c.lastName ?? ''}
+                    <Link href={`/dashboard/clients/${c.id}`} className="text-brand-600 hover:underline">
+                      {c.firstName} {c.lastName ?? ''}
+                    </Link>
                   </td>
                   <td className="px-4 py-3 text-gray-600 dark:text-zinc-400">{c.phone}</td>
                   <td className="px-4 py-3">

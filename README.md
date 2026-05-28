@@ -77,10 +77,10 @@ pnpm dev
 
 ## Дорожная карта
 
-- **Phase 1 — MVP (реализовано)**: auth, RBAC, branches, clients+vehicles, catalog, orders (создание + close-flow с pricing/discounts/bonuses/payments), basic dashboard, inventory list, cash shift open/close, WhatsApp адаптер, аудит, audit log, Azericard mock.
-- **Phase 2**: полный inventory (consumption templates + автосписание), payroll (4 модели), advanced analytics (retention/repeat/popularity), refunds, PDF invoices, mixed payments UI, реальный Azericard (после получения спеки), Z-отчёт.
-- **Phase 3**: client portal (online booking, история, бонусы), WhatsApp AI-bot (FAQ + запись через Ollama), Instagram (после App Review), сегментация и автокампании, queue/box management UI, фото до/после с MinIO + watermark, PWA offline-read.
-- **Phase 4**: масштабирование (multi-tenant SaaS, мобильное приложение, fiscal printer).
+- **Phase 1 — MVP**: реализовано (auth, CRM, заказы, закрытие, WhatsApp, Docker).
+- **Phase 2 — реализовано (каркас)**: appointments API+UI, refunds, payroll runs, inventory receive + автосписание при close, HTML-чеки, касса UI, mixed payments, analytics (top services/employees/box load), сегментация, Socket.io realtime, cron (birthday/inactive/low stock).
+- **Phase 3 — реализовано (каркас)**: client portal (запись/история/бонусы), AI chat (Ollama), Instagram webhook stub, i18n RU/AZ/EN переключатель.
+- **Остаётся для production**: реальный Azericard sandbox, Evolution API ключ, Meta Instagram App Review, PDF через puppeteer, e2e-тесты, PWA, фото MinIO, fiscal printer, multi-tenant SaaS.
 
 ## Замечания по плану `washerplan.md`
 

@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { getOrdersSocket } from '@/lib/socket';
 import { formatMoney, cn } from '@/lib/utils';
 import { Plus } from 'lucide-react';
 
@@ -19,8 +20,18 @@ export default function OrdersPage() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const load = () => api.listOrders().then((r) => setItems(r.items)).finally(() => setLoading(false));
+
   useEffect(() => {
-    api.listOrders().then((r) => setItems(r.items)).finally(() => setLoading(false));
+    load();
+    const user = JSON.parse(localStorage.getItem('user') ?? '{}');
+    const sock = user.branchId ? getOrdersSocket(user.branchId) : null;
+    sock?.on('order.updated', load);
+    sock?.on('order.created', load);
+    return () => {
+      sock?.off('order.updated', load);
+      sock?.off('order.created', load);
+    };
   }, []);
 
   return (

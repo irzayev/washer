@@ -23,7 +23,9 @@ export default function OrderDetailPage() {
   const [busy, setBusy] = useState(false);
 
   const [bonusUsed, setBonusUsed] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
+  const [payments, setPayments] = useState<{ method: PaymentMethod; amount: string }[]>([
+    { method: 'CASH', amount: '' },
+  ]);
   const [discountValue, setDiscountValue] = useState(0);
   const [discountReason, setDiscountReason] = useState('');
 
@@ -62,6 +64,12 @@ export default function OrderDetailPage() {
     return () => clearTimeout(t);
   }, [loadPreview]);
 
+  useEffect(() => {
+    if (preview && payments.length === 1 && !payments[0]!.amount) {
+      setPayments([{ method: 'CASH', amount: String(preview.grandTotal) }]);
+    }
+  }, [preview]);
+
   async function setStatus(status: string) {
     setBusy(true);
     setError(null);
@@ -84,10 +92,15 @@ export default function OrderDetailPage() {
         discountValue > 0
           ? [{ type: 'FIXED', value: discountValue, reason: discountReason || 'Скидка' }]
           : [];
+      const payLines = payments.map((p) => ({ method: p.method, amount: Number(p.amount) }));
+      const paySum = payLines.reduce((s, p) => s + p.amount, 0);
+      if (Math.abs(paySum - preview.grandTotal) > 0.01) {
+        throw new Error(`Сумма оплат ${paySum.toFixed(2)} ≠ итого ${preview.grandTotal.toFixed(2)}`);
+      }
       await api.closeOrder(id, {
         bonusUsed,
         discounts,
-        payments: [{ method: paymentMethod, amount: preview.grandTotal }],
+        payments: payLines,
         idempotencyKey: `close-${id}-${Date.now()}`,
       });
       await load();
@@ -209,18 +222,52 @@ export default function OrderDetailPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="label">Способ оплаты</label>
-                <select
-                  className="input"
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+              <div className="space-y-2">
+                <label className="label">Оплата (можно несколько способов)</label>
+                {payments.map((p, idx) => (
+                  <div key={idx} className="flex gap-2">
+                    <select
+                      className="input flex-1"
+                      value={p.method}
+                      onChange={(e) => {
+                        const next = [...payments];
+                        next[idx] = { ...next[idx]!, method: e.target.value as PaymentMethod };
+                        setPayments(next);
+                      }}
+                    >
+                      <option value="CASH">Наличные</option>
+                      <option value="POS">POS</option>
+                      <option value="AZERICARD">Azericard</option>
+                      <option value="TRANSFER">Перевод</option>
+                    </select>
+                    <input
+                      type="number"
+                      className="input w-28"
+                      value={p.amount}
+                      onChange={(e) => {
+                        const next = [...payments];
+                        next[idx] = { ...next[idx]!, amount: e.target.value };
+                        setPayments(next);
+                      }}
+                    />
+                    {payments.length > 1 && (
+                      <button
+                        type="button"
+                        className="btn-secondary px-2"
+                        onClick={() => setPayments(payments.filter((_, i) => i !== idx))}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="text-sm text-brand-600"
+                  onClick={() => setPayments([...payments, { method: 'POS', amount: '0' }])}
                 >
-                  <option value="CASH">Наличные</option>
-                  <option value="POS">POS терминал</option>
-                  <option value="AZERICARD">Azericard</option>
-                  <option value="TRANSFER">Перевод</option>
-                </select>
+                  + Добавить способ оплаты
+                </button>
               </div>
 
               {preview && (
@@ -262,6 +309,26 @@ export default function OrderDetailPage() {
             <div className="card">
               <h2 className="font-semibold">Оплата</h2>
               <p className="mt-2 text-2xl font-bold">{formatMoney(order.grandTotal)}</p>
+              <a
+                href={api.receiptUrl(id)}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 inline-block text-sm text-brand-600 hover:underline"
+                onClick={(e) => {
+                  e.preventDefault();
+                  fetch(api.receiptUrl(id), {
+                    headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+                  })
+                    .then((r) => r.text())
+                    .then((html) => {
+                      const w = window.open('', '_blank');
+                      w?.document.write(html);
+                      w?.document.close();
+                    });
+                }}
+              >
+                Печать чека
+              </a>
               {order.payments?.length > 0 && (
                 <ul className="mt-4 space-y-2 text-sm">
                   {order.payments.map((p: any) => (

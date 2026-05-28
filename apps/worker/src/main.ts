@@ -10,6 +10,7 @@ import {
 import { loadApiEnv } from '@washer/config';
 import { sendWhatsAppText } from './evolution';
 import { handleOutboxEvent } from './outbox';
+import { runCronJobs } from './cron';
 
 const env = loadApiEnv();
 const logger = pino({
@@ -123,6 +124,12 @@ notificationsWorker.on('failed', (_j, err) => logger.error({ err: err?.message }
 outboxWorker.on('failed', (_j, err) => logger.error({ err: err?.message }, 'outbox job failed'));
 
 logger.info('Worker started');
+
+void runCronJobs(prisma, logger).catch((e) => logger.error(e, 'initial cron failed'));
+setInterval(
+  () => void runCronJobs(prisma, logger).catch((e) => logger.error(e, 'cron failed')),
+  24 * 60 * 60 * 1000,
+);
 
 const shutdown = async () => {
   logger.info('Shutting down...');

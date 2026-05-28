@@ -1,7 +1,16 @@
 import type { Config } from 'tailwindcss';
+
 const config: Config = {
   content: ['./src/**/*.{ts,tsx}'],
-  theme: { extend: {} },
-  plugins: [],
+  theme: {
+    extend: {
+      colors: {
+        brand: {
+          600: '#2563eb',
+          700: '#1d4ed8',
+        },
+      },
+    },
+  },
 };
 export default config;

@@ -42,4 +42,34 @@ export class CatalogService {
   updateService(id: string, dto: UpdateServiceDto) {
     return this.prisma.service.update({ where: { id }, data: dto });
   }
+
+  listPackages() {
+    return this.prisma.servicePackage.findMany({
+      where: { isActive: true },
+      include: { items: { include: { service: true } } },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  createPackage(data: { name: string; description?: string; price: number; serviceIds: { serviceId: string; qty: number }[] }) {
+    return this.prisma.servicePackage.create({
+      data: {
+        name: data.name,
+        description: data.description ?? null,
+        price: data.price,
+        items: { create: data.serviceIds },
+      },
+      include: { items: { include: { service: true } } },
+    });
+  }
+
+  listPromotions(branchId?: string) {
+    return this.prisma.promotion.findMany({
+      where: {
+        isActive: true,
+        OR: [{ branchId: null }, ...(branchId ? [{ branchId }] : [])],
+      },
+      orderBy: { startsAt: 'desc' },
+    });
+  }
 }

@@ -22,6 +22,14 @@ import { AuditModule } from './modules/audit/audit.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { AzericardModule } from './modules/azericard/azericard.module';
+import { AppointmentsModule } from './modules/appointments/appointments.module';
+import { RefundsModule } from './modules/refunds/refunds.module';
+import { PayrollModule } from './modules/payroll/payroll.module';
+import { InvoicesModule } from './modules/invoices/invoices.module';
+import { BoxesModule } from './modules/boxes/boxes.module';
+import { RealtimeModule } from './modules/realtime/realtime.module';
+import { AiModule } from './modules/ai/ai.module';
+import { InstagramModule } from './modules/instagram/instagram.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
@@ -41,6 +49,7 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor';
     }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     PrismaModule,
+    RealtimeModule,
     AuthModule,
     UsersModule,
     BranchesModule,
@@ -58,6 +67,13 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor';
     NotificationsModule,
     WhatsappModule,
     AzericardModule,
+    AppointmentsModule,
+    RefundsModule,
+    PayrollModule,
+    InvoicesModule,
+    BoxesModule,
+    AiModule,
+    InstagramModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

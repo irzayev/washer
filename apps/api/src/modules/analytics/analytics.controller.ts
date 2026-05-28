@@ -20,4 +20,22 @@ export class AnalyticsController {
     if (!user.branchId) throw new BadRequestException('User has no branch');
     return this.analytics.revenueByDay(user.branchId, Number(days) || 30);
   }
+
+  @Get('top-services')
+  topServices(@CurrentUser() user: RequestUser, @Query('days') days?: string) {
+    if (!user.branchId) throw new BadRequestException('User has no branch');
+    return this.analytics.topServices(user.branchId, Number(days) || 30);
+  }
+
+  @Get('top-employees')
+  topEmployees(@CurrentUser() user: RequestUser, @Query('days') days?: string) {
+    if (!user.branchId) throw new BadRequestException('User has no branch');
+    return this.analytics.topEmployees(user.branchId, Number(days) || 30);
+  }
+
+  @Get('box-load')
+  boxLoad(@CurrentUser() user: RequestUser) {
+    if (!user.branchId) throw new BadRequestException('User has no branch');
+    return this.analytics.boxLoad(user.branchId);
+  }
 }

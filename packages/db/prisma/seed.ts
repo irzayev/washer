@@ -105,6 +105,34 @@ async function main() {
     skipDuplicates: true,
   });
 
+  const shampoo = await prisma.inventoryItem.findFirst({ where: { branchId: branch.id, sku: 'SHAMPOO-1' } });
+  const cloth = await prisma.inventoryItem.findFirst({ where: { branchId: branch.id, sku: 'CLOTH-1' } });
+  const washServices = await prisma.service.findMany({ where: { branchId: branch.id, categoryId: wash?.id } });
+  if (shampoo) {
+    for (const s of washServices) {
+      await prisma.serviceConsumption.upsert({
+        where: { serviceId_itemId: { serviceId: s.id, itemId: shampoo.id } },
+        update: {},
+        create: { serviceId: s.id, itemId: shampoo.id, qty: 200 },
+      });
+    }
+  }
+  if (cloth) {
+    for (const s of washServices) {
+      await prisma.serviceConsumption.upsert({
+        where: { serviceId_itemId: { serviceId: s.id, itemId: cloth.id } },
+        update: {},
+        create: { serviceId: s.id, itemId: cloth.id, qty: 1 },
+      });
+    }
+  }
+
+  await prisma.payrollProfile.upsert({
+    where: { userId: admin.id },
+    update: {},
+    create: { userId: admin.id, modelType: 'FIXED', params: { salary: 1500 } },
+  });
+
   console.log('Seed done.');
   console.log('Admin login:   admin@washer.local / Admin123!');
   console.log('Manager login: manager@washer.local / Manager123!');
