@@ -15,3 +15,10 @@ export class ReceiveStockDto {
   @IsNumber() @Min(0) unitCost!: number;
   @IsOptional() @IsString() note?: string;
 }
+
+export class UpdateInventoryItemDto {
+  @IsOptional() @IsString() sku?: string;
+  @IsOptional() @IsString() name?: string;
+  @IsOptional() @IsString() unit?: string;
+  @IsOptional() @IsNumber() @Min(0) minStock?: number;
+}

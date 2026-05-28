@@ -129,6 +129,10 @@ export const api = {
   convertAppointment: (id: string) => request<any>(`/appointments/${id}/convert-order`, { method: 'POST' }),
 
   listInventory: () => request<any[]>('/inventory'),
+  createInventoryItem: (body: { sku?: string; name: string; unit?: string; minStock?: number }) =>
+    request<any>('/inventory', { method: 'POST', body: JSON.stringify(body) }),
+  updateInventoryItem: (id: string, body: { sku?: string; name?: string; unit?: string; minStock?: number }) =>
+    request<any>(`/inventory/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   receiveStock: (body: { itemId: string; qty: number; unitCost: number; note?: string }) =>
     request<any>('/inventory/receive', { method: 'POST', body: JSON.stringify(body) }),
 

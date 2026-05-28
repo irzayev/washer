@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { StockMovementType } from '@washer/db';
 import { money } from '@washer/utils';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreateInventoryItemDto, ReceiveStockDto } from './dto/inventory.dto';
+import { CreateInventoryItemDto, ReceiveStockDto, UpdateInventoryItemDto } from './dto/inventory.dto';
 
 @Injectable()
 export class InventoryService {
@@ -27,6 +27,16 @@ export class InventoryService {
 
   create(branchId: string, dto: CreateInventoryItemDto) {
     return this.prisma.inventoryItem.create({ data: { ...dto, branchId } });
+  }
+
+  async update(branchId: string, itemId: string, dto: UpdateInventoryItemDto) {
+    const item = await this.prisma.inventoryItem.findFirst({ where: { id: itemId, branchId, isActive: true } });
+    if (!item) throw new NotFoundException('Item not found');
+
+    return this.prisma.inventoryItem.update({
+      where: { id: itemId },
+      data: dto,
+    });
   }
 
   async receive(branchId: string, dto: ReceiveStockDto, userId: string) {
