@@ -9,6 +9,7 @@ dist
 .env.local
 *.log
 .turbo
+**/*.tsbuildinfo
 coverage
 secrets
 *.pem

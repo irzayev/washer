@@ -19,9 +19,10 @@ FROM deps AS build
 COPY packages ./packages
 COPY apps/worker ./apps/worker
 RUN pnpm --filter @washer/db prisma:generate
-RUN npx tsc -p packages/types/tsconfig.json \
-    && npx tsc -p packages/utils/tsconfig.json \
-    && npx tsc -p packages/config/tsconfig.json
+RUN find packages apps -name '*.tsbuildinfo' -delete 2>/dev/null || true
+RUN pnpm --filter @washer/types build \
+    && pnpm --filter @washer/utils build \
+    && pnpm --filter @washer/config build
 RUN pnpm --filter @washer/worker build
 
 FROM base AS runner
