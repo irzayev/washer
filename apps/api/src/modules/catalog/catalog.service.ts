@@ -21,7 +21,12 @@ export class CatalogService {
   // services
   listServices(branchId?: string) {
     return this.prisma.service.findMany({
-      where: { isActive: true, OR: [{ branchId: null }, ...(branchId ? [{ branchId }] : [])] },
+      where: {
+        isActive: true,
+        ...(branchId
+          ? { OR: [{ branchId: null }, { branchId }] }
+          : {}),
+      },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       include: { category: true },
     });
