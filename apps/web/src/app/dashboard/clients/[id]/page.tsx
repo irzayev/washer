@@ -6,12 +6,14 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { formatMoney } from '@/lib/utils';
 import { ArrowLeft } from 'lucide-react';
+import { EditClientModal } from '@/components/edit-client-modal';
 
 export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [client, setClient] = useState<any>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [bonus, setBonus] = useState<any>(null);
+  const [editOpen, setEditOpen] = useState(false);
 
   useEffect(() => {
     Promise.all([api.getClient(id), api.clientHistory(id), api.clientBonus(id).catch(() => null)]).then(
@@ -27,7 +29,8 @@ export default function ClientDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
         <Link href="/dashboard/clients" className="btn-secondary">
           <ArrowLeft className="h-4 w-4" />
         </Link>
@@ -37,7 +40,18 @@ export default function ClientDetailPage() {
           </h1>
           <p className="text-sm text-gray-500">{client.phone}</p>
         </div>
+        </div>
+        <button className="btn-secondary" onClick={() => setEditOpen(true)}>
+          Редактировать
+        </button>
       </div>
+
+      <EditClientModal
+        open={editOpen}
+        client={client}
+        onClose={() => setEditOpen(false)}
+        onSaved={(updatedClient) => setClient(updatedClient)}
+      />
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="card">
