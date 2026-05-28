@@ -7,6 +7,15 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
+    "@washer/types#build": {
+      "outputs": ["dist/**"]
+    },
+    "@washer/utils#build": {
+      "outputs": ["dist/**"]
+    },
+    "@washer/config#build": {
+      "outputs": ["dist/**"]
+    },
     "dev": {
       "cache": false,
       "persistent": true

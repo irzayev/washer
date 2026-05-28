@@ -20,6 +20,7 @@ COPY packages ./packages
 COPY apps/api ./apps/api
 COPY apps/worker ./apps/worker
 RUN pnpm --filter @washer/db prisma:generate
+RUN pnpm --filter @washer/types build && pnpm --filter @washer/utils build && pnpm --filter @washer/config build
 RUN pnpm --filter @washer/api build
 
 FROM base AS runner
