@@ -24,6 +24,7 @@
     "docker:up": "docker compose -f infra/docker-compose.yml up -d --build",
     "docker:down": "docker compose -f infra/docker-compose.yml down",
     "docker:restart": "docker compose -f infra/docker-compose.yml up -d --build --force-recreate",
+    "build:packages": "pnpm --filter @washer/types build && pnpm --filter @washer/utils build && pnpm --filter @washer/config build",
     "docker:logs": "docker compose -f infra/docker-compose.yml logs -f"
   },
   "devDependencies": {
