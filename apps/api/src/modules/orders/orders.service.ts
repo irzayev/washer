@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { OrderStatus, Prisma, type VatMode } from '@washer/db';
+import { Decimal } from 'decimal.js';
 import { generateOrderNumber, money, round2, sumMoney } from '@washer/utils';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PricingService } from '../pricing/pricing.service';
@@ -115,6 +116,40 @@ export class OrdersService {
     if (status === OrderStatus.IN_PROGRESS && !order.startedAt) next.startedAt = new Date();
     if (status === OrderStatus.DELIVERED) next.deliveredAt = new Date();
     return this.prisma.order.update({ where: { id }, data: next });
+  }
+
+  async previewClose(
+    branchId: string,
+    id: string,
+    dto: { bonusUsed?: number; discounts?: { type: 'FIXED' | 'PERCENT' | 'MANUAL'; value: number; reason: string }[] },
+  ) {
+    const order = await this.findOne(branchId, id);
+    const branch = await this.prisma.branch.findUniqueOrThrow({ where: { id: branchId } });
+    const pricing = this.pricing.compute({
+      items: order.items.map((i) => ({
+        priceSnapshot: i.priceSnapshot,
+        qty: i.qty,
+        discount: i.discount,
+      })),
+      discounts: dto.discounts,
+      bonusUsedRequested: dto.bonusUsed,
+      vatMode: branch.vatMode as VatMode,
+      vatRate: branch.vatRate,
+    });
+    const wallet = order.client.bonusWallet;
+    const bonusBalance = wallet ? Number(wallet.balance) : 0;
+    const afterDiscount = pricing.subtotal.sub(pricing.discountTotal);
+    const bonusMaxUsable = Decimal.min(money(bonusBalance), afterDiscount.mul(0.3)).toNumber();
+    return {
+      subtotal: pricing.subtotal.toNumber(),
+      discountTotal: pricing.discountTotal.toNumber(),
+      bonusUsed: pricing.bonusUsed.toNumber(),
+      vatTotal: pricing.vatTotal.toNumber(),
+      grandTotal: pricing.grandTotal.toNumber(),
+      bonusEarned: pricing.bonusEarned.toNumber(),
+      bonusBalance,
+      bonusMaxUsable,
+    };
   }
 
   /**
@@ -262,7 +297,9 @@ export class OrdersService {
           type: 'order.closed',
           payload: {
             orderId: id,
+            orderNumber: order.number,
             clientId: order.clientId,
+            clientPhone: order.client.phone,
             grandTotal: pricing.grandTotal.toFixed(2),
             currency: branch.currency,
           },

@@ -3,11 +3,13 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { formatMoney } from '@/lib/utils';
 import { Search, Plus } from 'lucide-react';
+import { CreateClientModal } from '@/components/create-client-modal';
 
 export default function ClientsPage() {
   const [items, setItems] = useState<any[]>([]);
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -31,10 +33,12 @@ export default function ClientsPage() {
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-zinc-100">Клиенты</h1>
           <p className="text-sm text-gray-500">База клиентов и их автомобилей</p>
         </div>
-        <button className="btn-primary">
+        <button className="btn-primary" onClick={() => setModalOpen(true)}>
           <Plus className="h-4 w-4" /> Добавить клиента
         </button>
       </div>
+
+      <CreateClientModal open={modalOpen} onClose={() => setModalOpen(false)} onCreated={load} />
 
       <div className="card p-0">
         <div className="border-b border-gray-200 p-4 dark:border-zinc-800">

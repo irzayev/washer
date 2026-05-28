@@ -6,6 +6,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CloseOrderDto } from './dto/close-order.dto';
+import { PreviewCloseDto } from './dto/preview-close.dto';
 import { UpdateOrderStatusDto } from './dto/update-order.dto';
 
 @ApiTags('orders')
@@ -47,6 +48,13 @@ export class OrdersController {
   ) {
     if (!user.branchId) throw new BadRequestException('User has no branch');
     return this.orders.updateStatus(user.branchId, id, dto.status);
+  }
+
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Post(':id/preview-close')
+  previewClose(@CurrentUser() user: RequestUser, @Param('id') id: string, @Body() dto: PreviewCloseDto) {
+    if (!user.branchId) throw new BadRequestException('User has no branch');
+    return this.orders.previewClose(user.branchId, id, dto);
   }
 
   @Roles(UserRole.ADMIN, UserRole.MANAGER)

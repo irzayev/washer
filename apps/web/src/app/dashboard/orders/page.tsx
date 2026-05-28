@@ -1,8 +1,9 @@
 'use client';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { formatMoney } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import { formatMoney, cn } from '@/lib/utils';
+import { Plus } from 'lucide-react';
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   NEW: { label: 'Новый', cls: 'bg-gray-100 text-gray-700' },
@@ -24,9 +25,14 @@ export default function OrdersPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-zinc-100">Заказы</h1>
-        <p className="text-sm text-gray-500">Все рабочие заказы автомойки</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-zinc-100">Заказы</h1>
+          <p className="text-sm text-gray-500">Все рабочие заказы автомойки</p>
+        </div>
+        <Link href="/dashboard/orders/new" className="btn-primary">
+          <Plus className="h-4 w-4" /> Новый заказ
+        </Link>
       </div>
 
       <div className="card p-0 overflow-x-auto">
@@ -52,7 +58,14 @@ export default function OrdersPage() {
               const st = STATUS_LABEL[o.status] ?? { label: o.status, cls: 'bg-gray-100 text-gray-700' };
               return (
                 <tr key={o.id} className="hover:bg-gray-50 dark:hover:bg-zinc-800/50">
-                  <td className="px-4 py-3 font-mono text-xs text-gray-700 dark:text-zinc-300">{o.number}</td>
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/dashboard/orders/${o.id}`}
+                      className="font-mono text-xs text-brand-600 hover:underline"
+                    >
+                      {o.number}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3 text-gray-900 dark:text-zinc-100">
                     {o.client?.firstName} {o.client?.lastName ?? ''}
                   </td>
@@ -65,7 +78,7 @@ export default function OrdersPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right font-medium text-gray-900 dark:text-zinc-100">
-                    {formatMoney(o.grandTotal)}
+                    {formatMoney(o.grandTotal || o.subtotal)}
                   </td>
                   <td className="px-4 py-3 text-gray-500">
                     {new Date(o.openedAt).toLocaleString('ru-RU')}

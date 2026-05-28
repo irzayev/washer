@@ -1,8 +1,15 @@
 import 'reflect-metadata';
 import { Worker, Queue, type ConnectionOptions } from 'bullmq';
 import pino from 'pino';
-import { PrismaClient, NotificationStatus, OutboxStatus } from '@washer/db';
+import {
+  PrismaClient,
+  NotificationStatus,
+  OutboxStatus,
+  NotificationChannel,
+} from '@washer/db';
 import { loadApiEnv } from '@washer/config';
+import { sendWhatsAppText } from './evolution';
+import { handleOutboxEvent } from './outbox';
 
 const env = loadApiEnv();
 const logger = pino({
@@ -18,26 +25,40 @@ const connection: ConnectionOptions = {
 
 const prisma = new PrismaClient();
 
-export const QUEUES = {
-  notifications: 'notifications',
-  outbox: 'outbox',
-  cron: 'cron',
-} as const;
-
-const notificationsQueue = new Queue(QUEUES.notifications, { connection });
-const outboxQueue = new Queue(QUEUES.outbox, { connection });
+const notificationsQueue = new Queue('notifications', { connection });
+const outboxQueue = new Queue('outbox', { connection });
 
 const notificationsWorker = new Worker(
-  QUEUES.notifications,
+  'notifications',
   async (job) => {
     const id = job.data.id as string;
     const n = await prisma.notification.findUnique({ where: { id } });
     if (!n || n.status !== NotificationStatus.PENDING) return;
 
-    logger.info({ id, channel: n.channel, template: n.template }, 'sending notification');
+    const payload = n.payload as { phone?: string; text?: string };
 
-    // TODO: dispatch by channel (WHATSAPP -> EvolutionService, SMS -> SMS provider, EMAIL -> Resend)
-    // For MVP: mark as SENT.
+    if (n.channel === NotificationChannel.WHATSAPP && payload.phone && payload.text) {
+      const result = await sendWhatsAppText(payload.phone, payload.text);
+      if (result.ok) {
+        await prisma.notification.update({
+          where: { id },
+          data: { status: NotificationStatus.SENT, sentAt: new Date(), attempts: { increment: 1 } },
+        });
+        logger.info({ id, ref: result.ref }, 'WhatsApp sent');
+      } else {
+        await prisma.notification.update({
+          where: { id },
+          data: {
+            status: NotificationStatus.FAILED,
+            attempts: { increment: 1 },
+            lastError: result.error?.slice(0, 500) ?? 'send failed',
+          },
+        });
+        logger.warn({ id, error: result.error }, 'WhatsApp failed');
+      }
+      return;
+    }
+
     await prisma.notification.update({
       where: { id },
       data: { status: NotificationStatus.SENT, sentAt: new Date(), attempts: { increment: 1 } },
@@ -47,19 +68,30 @@ const notificationsWorker = new Worker(
 );
 
 const outboxWorker = new Worker(
-  QUEUES.outbox,
+  'outbox',
   async (job) => {
     const id = job.data.id as string;
     const e = await prisma.outboxEvent.findUnique({ where: { id } });
     if (!e || e.status !== OutboxStatus.PENDING) return;
 
-    logger.info({ id, type: e.type }, 'processing outbox event');
-
-    // TODO: route by event type (order.closed -> create WA notification, etc.)
-    await prisma.outboxEvent.update({
-      where: { id },
-      data: { status: OutboxStatus.PROCESSED, processedAt: new Date() },
-    });
+    try {
+      await handleOutboxEvent(prisma, e.type, e.payload);
+      await prisma.outboxEvent.update({
+        where: { id },
+        data: { status: OutboxStatus.PROCESSED, processedAt: new Date() },
+      });
+      logger.info({ id, type: e.type }, 'outbox processed');
+    } catch (err) {
+      await prisma.outboxEvent.update({
+        where: { id },
+        data: {
+          status: OutboxStatus.FAILED,
+          attempts: { increment: 1 },
+          lastError: (err as Error).message.slice(0, 500),
+        },
+      });
+      throw err;
+    }
   },
   { connection, concurrency: 10 },
 );
@@ -87,8 +119,8 @@ setInterval(() => {
   pollAndEnqueue().catch((e) => logger.error(e, 'poll failed'));
 }, 5000);
 
-notificationsWorker.on('failed', (j, err) => logger.error({ err: err?.message }, 'job failed'));
-outboxWorker.on('failed', (j, err) => logger.error({ err: err?.message }, 'outbox failed'));
+notificationsWorker.on('failed', (_j, err) => logger.error({ err: err?.message }, 'notification job failed'));
+outboxWorker.on('failed', (_j, err) => logger.error({ err: err?.message }, 'outbox job failed'));
 
 logger.info('Worker started');
 
