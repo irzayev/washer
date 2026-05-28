@@ -110,6 +110,21 @@ services:
       - api
     restart: unless-stopped
 
+  client-portal:
+    build:
+      context: ..
+      dockerfile: docker/client-portal.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:4000
+    container_name: washer-client-portal
+    environment:
+      NODE_ENV: production
+    ports:
+      - '3001:3001'
+    depends_on:
+      - api
+    restart: unless-stopped
+
   evolution-api:
     profiles: ['extras']
     image: atendai/evolution-api:latest
